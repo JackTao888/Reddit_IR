@@ -1,0 +1,9 @@
+# Crawler dependencies (current implementation phase)
+praw>=7.7,<8
+python-dotenv>=1.0
+
+# Test runner
+pytest>=7.0
+
+# Other modules will add their deps later:
+# nltk, scikit-learn, numpy, flask, ir-measures

@@ -46,7 +46,16 @@ finalProject/
     processed/          # cleaned docs + token lists
     qrels/              # query relevance labels
   src/
-    scraper.py
+    crawler/
+      __init__.py
+      config.py
+      client.py
+      collectors.py
+      filters.py
+      serializers.py
+      checkpoint.py
+      runner.py
+      cli.py
     preprocess.py
     index.py
     rankers/
@@ -66,6 +75,21 @@ Keeping this layout from the beginning helps avoid last-week refactors and makes
 
 ---
 
+## 3.1.1 Initial Build Order (Structure-First)
+
+To keep development clean, implement in this order:
+
+1. `src/crawler/` package + `data/raw/` (crawler foundation)
+2. `src/preprocess.py` + `data/processed/`
+3. `src/index.py` + serialized index artifacts
+4. `src/rankers/tfidf_ranker.py` and `src/rankers/bm25_ranker.py`
+5. `src/evaluate.py` + `data/qrels/`
+6. `src/app.py` (Flask UI) only after retrieval is stable
+
+This prevents UI work from blocking core IR progress.
+
+---
+
 ## 3.2 Reuse from Homework (What to Port)
 
 Based on existing implementations in `hw2`/`hw3`/`hw4`, the project should explicitly reuse:
@@ -82,12 +106,137 @@ Porting these avoids re-inventing solved components and directly improves both e
 
 ## 4. Modules
 
-### M1 — Reddit Scraper
+### M1 — Reddit Crawler Package
 - Connect to Reddit via PRAW using OAuth credentials
 - Select 3–5 subreddits with distinct vocabularies (e.g. r/science, r/programming, r/cooking, r/AskHistorians)
 - Fetch 5,000–10,000 posts including title, body, top comments, score, subreddit, and URL
 - Handle pagination and API rate limits
 - Save raw data as JSON files, one file per subreddit
+
+### M1.1 — Crawler Specification (Detailed, First Implementation Target)
+
+**Goal**
+- Collect a reproducible, balanced Reddit corpus across selected subreddits for downstream indexing/ranking.
+
+**Input configuration**
+- `subreddits`: list of subreddit names (3-5)
+- `post_limit_per_subreddit`: integer target (e.g., 2000 each)
+- `comment_limit_per_post`: integer (e.g., top 5)
+- `time_filter`: one of `day/week/month/year/all`
+- `sort_mode`: one of `hot/new/top`
+- `output_dir`: default `data/raw/`
+- `resume`: boolean flag to continue from prior run
+
+**Package structure (DRY + robust)**
+- `config.py`
+  - Typed config dataclass and env/CLI merge logic
+  - Central place for rate, retry, and crawl parameters
+- `client.py`
+  - PRAW client creation and auth validation
+  - Single API access layer (no raw PRAW calls outside this module)
+- `collectors.py`
+  - Subreddit/post/comment fetch logic
+  - Iterator-style generators for memory-safe batching
+- `filters.py`
+  - Content quality filters (`deleted`, score threshold, NSFW policy, language if needed)
+- `serializers.py`
+  - JSON schema enforcement, normalization, and JSONL writing
+- `checkpoint.py`
+  - Resume state (`seen_post_ids`, per-subreddit progress, cursor/time window)
+- `runner.py`
+  - Orchestrates crawl loop, retries, sleep, and failure handling
+- `cli.py`
+  - CLI argument parsing and invocation of `runner.run()`
+
+**Output files**
+- `data/raw/<subreddit>.jsonl` (one JSON object per post)
+- `data/raw/crawl_manifest.json` (run metadata + counters)
+- Optional: `data/raw/errors.log` (failed fetches/post IDs)
+
+**Per-document JSON schema**
+```json
+{
+  "doc_id": "science_t3_abc123",
+  "post_id": "abc123",
+  "subreddit": "science",
+  "title": "post title",
+  "selftext": "body text",
+  "top_comments": ["comment 1", "comment 2"],
+  "url": "https://www.reddit.com/...",
+  "permalink": "/r/science/comments/abc123/...",
+  "created_utc": 1714195200,
+  "score": 1532,
+  "num_comments": 147,
+  "over_18": false,
+  "is_self": true,
+  "retrieved_at": "2026-04-27T05:00:00Z"
+}
+```
+
+**Crawling strategy**
+- Use PRAW listing API (`subreddit.top/new/hot`) with explicit limits.
+- For each post:
+  - Skip removed/deleted stubs with empty `title` and `selftext`.
+  - Call `replace_more(limit=0)` before reading comments.
+  - Keep only top-N comments ranked by Reddit ordering in the listing.
+- Balance corpus size by enforcing per-subreddit caps.
+
+**Anti-crawler / anti-abuse resilience strategy**
+- Respect authenticated API usage only (no HTML scraping).
+- Enforce conservative request pacing:
+  - fixed base delay + random jitter between pull batches
+  - per-subreddit cool-down when 429/rate warnings appear
+- Use bounded retries with exponential backoff and retryable error classification.
+- Implement circuit-breaker behavior:
+  - if repeated failures exceed threshold, pause subreddit crawl and move to next one.
+- Persist checkpoint every N saved posts (e.g., every 50) to avoid losing progress on interruption.
+- Add run-level idempotency:
+  - repeated runs with `--resume` safely skip existing `post_id`s.
+
+**Deduplication policy**
+- Primary key: `post_id`
+- If a post already exists in output, skip unless `--refresh` is set.
+- Keep a `seen_post_ids` set loaded from existing JSONL when `resume=True`.
+
+**Rate-limit and fault tolerance**
+- Honor PRAW internal rate-limit handling; never bypass API controls.
+- Retry transient API failures with exponential backoff (e.g., 1s, 2s, 4s; max 3 tries).
+- Add jitter to retries to avoid synchronized retry bursts.
+- On permanent failure, log post/subreddit and continue (never abort whole crawl).
+- Emit structured error categories in logs: `auth`, `rate_limit`, `network`, `parse`, `unknown`.
+
+**Data quality rules**
+- Normalize whitespace in text fields.
+- Preserve raw punctuation/case in raw files (normalization happens in preprocessing).
+- Enforce UTF-8 writing and escape invalid characters safely.
+
+**CLI contract (required)**
+- `python -m src.crawler.cli --subreddits science programming cooking --limit 2000 --comments 5 --sort top --time month`
+- Optional flags:
+  - `--resume`
+  - `--output data/raw`
+  - `--min-score <int>` (optional filtering)
+  - `--refresh` (re-fetch existing IDs)
+  - `--batch-sleep-ms <int>` and `--jitter-ms <int>`
+  - `--max-retries <int>` and `--checkpoint-every <int>`
+
+**Crawler completion criteria**
+- At least 5,000 total posts collected with all required fields non-null where applicable.
+- `crawl_manifest.json` records:
+  - total posts attempted/saved/skipped
+  - per-subreddit counts
+  - run start/end timestamps
+  - crawler parameters used
+- Re-running with `--resume` does not duplicate records.
+
+**Testing strategy for crawler package**
+- Unit tests for:
+  - schema serialization
+  - dedup/checkpoint resume
+  - retry/backoff classification logic
+- Integration smoke test:
+  - crawl 1 subreddit with small limits (e.g., 20 posts, 2 comments/post)
+  - verify JSONL + manifest + no duplicates after rerun
 
 ### M2 — Preprocessor
 - Tokenize text using NLTK word tokenizer
