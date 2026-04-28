@@ -56,12 +56,36 @@ finalProject/
       checkpoint.py
       runner.py
       cli.py
-    preprocess.py
-    index.py
+    preprocess/
+      __init__.py
+      config.py
+      tokens.py
+      stopwords.py
+      pipeline.py
+      cli.py
+    index/
+      __init__.py
+      config.py
+      inverted.py
+      store.py
+      builder.py
+      cli.py
     rankers/
+      __init__.py
+      base.py
+      query.py
       tfidf_ranker.py
       bm25_ranker.py
-    evaluate.py
+      cli.py
+    evaluate/
+      __init__.py
+      config.py
+      queries.py
+      qrels.py
+      metrics.py
+      pool.py
+      runner.py
+      cli.py
     app.py
     utils.py
   notebooks/            # optional exploratory analysis
@@ -248,6 +272,101 @@ Porting these avoids re-inventing solved components and directly improves both e
   - `full_text = title + " " + selftext + " " + top_comments`
 - Store document length after preprocessing (needed for BM25 length normalization)
 
+### M2.1 — Preprocessor Specification (Detailed)
+
+**Goal**
+- Convert raw crawler JSONL into clean tokenized JSONL ready for indexing,
+  while preserving metadata for snippet rendering.
+
+**Input / Output**
+- Input: `data/raw/<subreddit>.jsonl` (crawler schema, see M1.1)
+- Output: `data/processed/<subreddit>.jsonl`
+
+**Per-document output schema**
+```json
+{
+  "doc_id": "science_abc123",
+  "post_id": "abc123",
+  "subreddit": "science",
+  "title": "original title",
+  "selftext_excerpt": "first ~500 chars of body",
+  "url": "...",
+  "permalink": "...",
+  "score": 1532,
+  "title_tokens": ["..."],
+  "body_tokens": ["..."],
+  "comments_tokens": ["..."],
+  "all_tokens": ["..."],
+  "title_len": 12,
+  "body_len": 173,
+  "comments_len": 60,
+  "doc_len": 245,
+  "preprocessing": {
+    "lowercase": true,
+    "remove_stopwords": true,
+    "stem": true,
+    "stemmer": "snowball"
+  }
+}
+```
+
+**Reddit-aware text cleaning**
+- Strip URLs (inline replacement with whitespace).
+- Remove markdown decorations: `*`, `**`, `_`, code fences, blockquotes.
+- Optionally strip subreddit (`/r/foo`) and user (`/u/bar`) mentions.
+- Drop deleted-comment markers (`[removed]`, `[deleted]`).
+- Normalize whitespace.
+
+**Tokenization rules**
+- Use NLTK word tokenizer when available; fall back to a regex tokenizer so
+  the package is testable without NLTK data downloaded.
+- Lowercase all tokens (configurable).
+- Drop pure-numeric tokens (configurable).
+- Drop tokens shorter than `min_token_length` (default 2).
+
+**Stopwords**
+- English stopword set from NLTK if available, plus a curated Reddit list:
+  `tldr, edit, op, oc, eli5, ama, imo, imho, fwiw, iirc, lol, lmao, upvote,
+  downvote, karma, mod, mods, sub, subreddit, post, comment, removed, deleted`.
+- Custom additions allowed via a path to a plain-text file (one word per line).
+
+**Stemming**
+- Default: Snowball (English) — matches hw2.
+- Configurable: `snowball | porter | none`.
+- Stem after stopword removal so stemmed stopwords don't leak back in.
+
+**Field handling**
+- Keep three token streams (`title_tokens`, `body_tokens`, `comments_tokens`)
+  for field-aware ranking later.
+- Also produce `all_tokens = title_tokens + body_tokens + comments_tokens`.
+- `doc_len = len(all_tokens)` for BM25 length normalization.
+
+**CLI contract**
+- `python -m src.preprocess.cli --input data/raw --output data/processed`
+- Optional flags:
+  - `--no-stem`, `--stemmer porter|snowball`
+  - `--no-stopwords`, `--extra-stopwords path/to/file.txt`
+  - `--no-lowercase`
+  - `--keep-numeric`
+  - `--min-token-len <int>`
+  - `--keep-subreddit-refs`
+
+**Completion criteria**
+- For every input JSONL line, produce exactly one output line preserving `doc_id`.
+- Token streams never empty for non-removed posts; if all tokens are filtered,
+  fall back to keeping the title tokens unfiltered to avoid empty docs.
+- Per-subreddit and global stats printed at end:
+  total docs, mean `doc_len`, vocabulary size estimate.
+
+**Testing strategy**
+- Unit tests:
+  - URL / markdown stripping
+  - tokenizer fallback (no NLTK data installed)
+  - stopword + stemming combinations
+  - schema correctness against a synthetic crawler record
+- Integration smoke test:
+  - run pipeline on a tiny synthetic JSONL, verify output schema and counts.
+
 ### M3 — Inverted Index Builder
 - Build a term → {doc_id: term_frequency} mapping from the preprocessed corpus
 - Compute document frequency (DF) for every term
@@ -256,11 +375,77 @@ Porting these avoids re-inventing solved components and directly improves both e
 - Persist a metadata table with:
   - `doc_id`, `title`, `subreddit`, `url`, `raw_score`, `doc_len`, `raw_text`
 
+### M3.1 — Inverted Index Specification (Detailed)
+
+**Goal**
+- Convert processed JSONL into a self-contained, on-disk index artifact
+  that supports both plain BM25 and field-aware BM25 with a single load.
+
+**Input / Output**
+- Input: `data/processed/<subreddit>.jsonl` (preprocess schema, see M2.1)
+- Output (default `data/index/`):
+  - `index.pkl` — pickled `IndexArtifacts` (the structures below)
+  - `manifest.json` — human-readable corpus stats + build config
+
+**Core data structures**
+- `InvertedIndex` (one per indexed field):
+  - `term_to_postings: Dict[str, Dict[doc_id, tf]]`
+  - `df: Dict[str, int]`
+  - `doc_lens: Dict[doc_id, int]`
+  - `n_docs: int`, `total_tokens: int`
+  - derived: `avgdl`, `vocab_size`
+- `DocMetadata` (per document, for ranking + display):
+  - `doc_id`, `post_id`, `subreddit`, `title`, `selftext_excerpt`, `url`,
+    `permalink`, `score`, `title_len`, `body_len`, `comments_len`, `doc_len`
+- `IndexArtifacts`:
+  - `indexes: Dict[str, InvertedIndex]` keyed by `{"all", "title", "body", "comments"}`
+  - `doc_store: DocStore`
+  - `config: dict` (serialized build config)
+  - `built_at: str` (ISO timestamp)
+
+**Per-field indexes**
+- `all` is the union of title/body/comments tokens — used by plain BM25 and TF-IDF.
+- `title`, `body`, `comments` are kept separately so M5 can run field-aware BM25
+  with no recomputation.
+
+**Persistence**
+- `pickle.HIGHEST_PROTOCOL` for the binary artifact (fastest for ~10k docs).
+- A sibling `manifest.json` records corpus stats and build config so the index
+  is debuggable without unpickling.
+
+**Query-time API**
+- `IndexArtifacts.load(dir)` returns the bundle.
+- `idx = artifacts.indexes["all"]; idx.df["term"]; idx.term_to_postings["term"]`.
+- `artifacts.doc_store.get(doc_id) -> DocMetadata` for result rendering.
+
+**CLI contract**
+- `python -m src.index.cli build --input data/processed --output data/index`
+- `python -m src.index.cli stats --index-dir data/index`
+- Subcommands keep build and inspection separate (mirrors the rest of the project).
+
+**Completion criteria**
+- Every input doc contributes to all four indexes (or zero-length entries when a
+  field is empty).
+- Reload from disk produces an `IndexArtifacts` whose `stats()` matches the
+  manifest written at build time.
+- Building 10k docs runs in < 30s on a laptop.
+
+**Testing strategy**
+- Unit tests:
+  - `InvertedIndex.add_document` term-frequency and DF correctness
+  - `avgdl` after multiple docs
+  - empty-doc handling
+  - save/load roundtrip
+- Integration smoke test:
+  - run builder against a tiny synthetic processed JSONL,
+    verify per-field indexes, manifest, and reloaded stats.
+
 ### M4 — TF-IDF Ranker
-- Use scikit-learn's TfidfVectorizer to build a TF-IDF document-term matrix
-- At query time, vectorize the query using the same vocabulary and IDF weights
-- Compute cosine similarity between query vector and all document vectors
-- Return ranked list of top-k documents with scores
+- Implement TF-IDF cosine similarity from scratch on top of the M3 inverted index
+  (no sklearn dependency — keeps preprocessing/query path consistent with BM25).
+- Use sublinear TF: `w(t,d) = (1 + log(tf)) * log(N / df)`.
+- Precompute document norms once at ranker construction.
+- At query time, look up postings for query terms and accumulate cosine score.
 
 ### M5 — BM25 Ranker (from scratch)
 - Implement BM25 scoring formula manually using NumPy
@@ -275,6 +460,62 @@ Porting these avoids re-inventing solved components and directly improves both e
 - Add field-aware BM25 option:
   - `score(D, Q) = w_title * BM25(title, Q) + w_body * BM25(body, Q) + w_comments * BM25(comments, Q)`
   - Start with `w_title=2.0, w_body=1.0, w_comments=1.2`, then tune on dev queries
+
+### M4-M5.1 — Rankers Specification (Detailed)
+
+**Goal**
+- Provide two interchangeable rankers (TF-IDF cosine, BM25) that share query
+  preprocessing and result types, so the Flask UI / evaluator can swap them.
+
+**Public API**
+- `RankResult(rank: int, doc_id: str, score: float)`
+- `BaseRanker.search(query: str, *, top_k: int = 10) -> List[RankResult]`
+- Subclasses:
+  - `TfidfRanker(artifacts)`
+  - `Bm25Ranker(artifacts, k1=1.5, b=0.75, field_weights=None)`
+- Field-aware mode is enabled by passing `field_weights={"title": 2.0, "body": 1.0, "comments": 1.2}`.
+
+**Query preparation**
+- Tokenize and normalize the user query using the same preprocessing pipeline
+  that built the index (lowercase, stopwords, stemmer, min length, etc.).
+- The index artifact records its `preprocessing` metadata so the ranker can
+  reproduce it without parameters from the caller.
+
+**TF-IDF math**
+- IDF: `idf(t) = log(N / df(t))`
+- Doc weight: `w(t,d) = (1 + log(tf(t,d))) * idf(t)`
+- Query weight: same formula on query TF
+- Score: `cos(q, d) = (q · d) / (||q|| * ||d||)`
+- Per-doc norms precomputed at construction time.
+
+**BM25 math**
+- `idf(t) = log((N - df(t) + 0.5) / (df(t) + 0.5) + 1)` (Lucene-style, always positive)
+- `score(d) = Σ_{t∈Q} idf(t) * (tf * (k1 + 1)) / (tf + k1 * (1 - b + b * |d| / avgdl))`
+- Defaults: `k1=1.5`, `b=0.75`
+- Field-aware mode runs the same formula on each per-field index and weights the sums.
+
+**CLI contract**
+- `python -m src.rankers.cli search --query "python async websocket" --top-k 10 --ranker bm25`
+- `--ranker {tfidf,bm25}` chooses the model; BM25 accepts `--k1`, `--b`, and
+  `--field-aware` plus `--w-title --w-body --w-comments`.
+- `--index-dir` defaults to `data/index`.
+- Without `--query`, reads queries interactively from stdin.
+
+**Completion criteria**
+- Both rankers run on the same index without rebuilding.
+- Query tokens match document tokens exactly (verified by stem+stopword tests).
+- Ranking is deterministic for a fixed query/index/parameters.
+- BM25 plain and field-aware return non-empty results when any query term has
+  positive `df`; both return `[]` cleanly for empty / OOV-only queries.
+
+**Testing strategy**
+- Unit:
+  - TF-IDF and BM25 ordering on a 3-doc synthetic corpus (no sklearn).
+  - Both rankers return `[]` for OOV query.
+  - Field-aware BM25 weight=0 disables a field.
+  - Query stemming/stopword consistency with index settings.
+- Integration:
+  - end-to-end: build index from synthetic processed JSONL → run both rankers.
 
 ### M6 — Flask Query Interface
 - Simple web UI with a search bar and ranker toggle (TF-IDF / BM25)
@@ -291,6 +532,61 @@ Porting these avoids re-inventing solved components and directly improves both e
   - MAP (Mean Average Precision)
 - Produce a results table for the writeup
 - **Important:** Label relevance judgments before running the system to avoid post-hoc bias (as required by the assignment)
+
+### M7.1 — Evaluation Specification (Detailed)
+
+**Goal**
+- Produce reusable per-query / aggregate metrics for any number of ranker
+  variants against a fixed, hand-labeled qrels file.
+
+**Workflow (label-before-eval, TREC-style pooled labeling)**
+1. Author a fixed query set (`queries.json`) before any metric runs.
+2. Generate a *pool* per query: union of top-N results across all rankers
+   under consideration. Pool order is shuffled and scores are not shown,
+   so the labeler is blind to ranker output.
+3. Manually fill the `label` column in `pool.csv` (0 = not relevant, 1 = relevant;
+   integers >1 supported for graded relevance).
+4. Lock the labeled file as `qrels.csv` and run `evaluate run` against it.
+   The same qrels file is reused as new ranker variants are tried.
+
+**Files**
+- `data/qrels/queries.json` — `{"queries": [{"qid": "...", "text": "..."}, ...]}`
+- `data/qrels/pool.csv`     — pool template generated by the tool
+- `data/qrels/qrels.csv`    — same shape as pool.csv but with `label` filled
+- `data/qrels/results.csv`  — per-query metrics (one row per ranker × qid)
+- `data/qrels/summary.csv`  — aggregate metrics (one row per ranker)
+
+**Pool format (CSV)**
+- Columns: `qid, query, doc_id, subreddit, title, excerpt, label`
+- Rows are shuffled within each query (deterministic seed) so the labeler
+  isn't anchored on any single ranker's order.
+- Empty `label` is interpreted as `0` at evaluation time.
+
+**Metrics implemented (pure-python, no ir-measures dep)**
+- `precision_at_k(retrieved, qrels, k)` — fraction of top-k that are relevant
+- `average_precision(retrieved, qrels)` — divides by total relevant in qrels
+- `dcg_at_k`, `ndcg_at_k` — supports graded relevance (NDCG); binary fallback
+- `mean_*` aggregators across queries
+
+**Default ranker matrix**
+- `tfidf` — TF-IDF cosine
+- `bm25` — plain BM25 (k1=1.5, b=0.75)
+- `bm25_field` — field-aware BM25 (default weights from M5)
+- Customizable via `--rankers` flag.
+
+**CLI contract**
+- `python -m src.evaluate.cli pool --queries q.json --index-dir data/index --output pool.csv --depth 20`
+- `python -m src.evaluate.cli run  --queries q.json --qrels qrels.csv --index-dir data/index --output-dir data/qrels`
+
+**Completion criteria**
+- Pool generation is deterministic for a fixed seed.
+- Metrics implementations verified against worked-out examples in unit tests.
+- `run` produces both per-query and aggregate CSVs plus a console summary table.
+- Unjudged docs counted as non-relevant (TREC convention).
+
+**Testing strategy**
+- Unit tests for each metric on small known examples (P@k, AP, NDCG, MAP).
+- Integration test: build tiny index → generate pool → fake qrels → run eval.
 
 ### M8 — Writeup & Packaging
 - Cover page: team names, section (466/666), email, 1–3 line project summary
