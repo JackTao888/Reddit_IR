@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}{% if query %}{{ query }} &mdash; {% endif %}Reddit IR{% endblock %}
+{% block content %}
+  {% if not query %}
+    <p class="empty">Enter a query above to search.</p>
+  {% elif not results %}
+    <p class="empty">No results for <strong>{{ query }}</strong> using <code>{{ current_ranker }}</code>.</p>
+  {% else %}
+    <p class="meta">
+      Top <strong>{{ results|length }}</strong> results from
+      <code>{{ current_ranker }}</code> for <strong>{{ query }}</strong>.
+    </p>
+    <ol class="results">
+      {% for r in results %}
+        <li class="result-card">
+          <h3 class="result-title">
+            <a href="https://reddit.com{{ r.meta.permalink }}" target="_blank" rel="noopener">{{ r.meta.title }}</a>
+          </h3>
+          <div class="result-meta">
+            <span class="badge">r/{{ r.meta.subreddit }}</span>
+            <span>rank&nbsp;{{ r.rank }}</span>
+            <span>score&nbsp;<code>{{ "%.4f"|format(r.score) }}</code></span>
+            <span class="muted">reddit&nbsp;&uarr;{{ r.meta.score }}</span>
+          </div>
+          <div class="snippet">{{ r.snippet }}</div>
+        </li>
+      {% endfor %}
+    </ol>
+  {% endif %}
+{% endblock %}

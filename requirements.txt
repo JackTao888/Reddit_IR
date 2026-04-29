@@ -5,8 +5,11 @@ python-dotenv>=1.0
 # Preprocessing (NLTK is a soft dep; package degrades to regex/identity if missing)
 nltk>=3.8
 
+# Web UI
+flask>=3.0
+
 # Test runner
 pytest>=7.0
 
-# Other modules will add their deps later:
-# scikit-learn, numpy, flask, ir-measures
+# Other modules may add their deps later:
+# scikit-learn, numpy, ir-measures

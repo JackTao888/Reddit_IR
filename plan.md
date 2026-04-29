@@ -86,7 +86,20 @@ finalProject/
       pool.py
       runner.py
       cli.py
-    app.py
+    app/
+      __init__.py
+      config.py
+      rankers_pool.py
+      highlight.py
+      views.py
+      cli.py
+      templates/
+        base.html
+        index.html
+        results.html
+        compare.html
+      static/
+        style.css
     utils.py
   notebooks/            # optional exploratory analysis
   tests/                # unit tests for tokenizer/ranker/eval
@@ -522,6 +535,49 @@ Porting these avoids re-inventing solved components and directly improves both e
 - Result cards showing: post title, subreddit, retrieval score, text snippet, link to original Reddit post
 - Pagination for top-k results (default k=10)
 - Optional: side-by-side comparison mode showing both rankers' results for the same query
+
+### M6.1 — Flask UI Specification (Detailed)
+
+**Goal**
+- Provide a simple, demo-ready web UI that exercises the full pipeline
+  (index + rankers) with snippet highlighting and a side-by-side compare view.
+
+**Architecture**
+- Flask **app factory** (`create_app(AppConfig)`) so tests can build isolated instances.
+- **Singleton index + ranker pool** loaded at startup via `RankerPool`
+  (TF-IDF doc-norm precomputation amortized once, not per-request).
+- One **Blueprint** (`main`) registers all routes; templates and static files
+  live inside `src/app/`.
+
+**Routes**
+- `GET /`              — landing page with search form + corpus stats
+- `GET /search?q=&ranker=&k=` — single-ranker results page
+- `GET /compare?q=&k=` — side-by-side results from all available rankers
+- Static: `/static/style.css`
+
+**Available rankers (UI)**
+- `tfidf`, `bm25`, `bm25_field` — same as evaluation defaults.
+
+**Snippet rendering**
+- Reuses the index's preprocessing metadata to stem each candidate word in the
+  source excerpt, matches stems against the stemmed query, then highlights
+  matching word occurrences with `<mark>` tags.
+- Snippet is centered around the first match (~60 chars before, ~max 300 total).
+
+**CLI contract**
+- `python -m src.app.cli serve --index-dir data/index --port 5000`
+- `--host`, `--debug` available for local dev.
+
+**Completion criteria**
+- App starts in < 5s with a 10k-doc index.
+- Search round-trips query and ranker selection in the URL (shareable links).
+- Empty query and OOV query render gracefully (no 500s).
+- All templates render with a fresh app + tiny synthetic index in tests.
+
+**Testing strategy**
+- Use Flask's test client with a tiny synthetic index built per-test.
+- Tests cover: index page, search returns expected doc, empty query OK,
+  compare page shows multiple rankers, unknown ranker returns 400.
 
 ### M7 — Evaluation Harness
 - Define 15–20 test queries covering a range of topics and difficulty levels

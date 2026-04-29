@@ -48,3 +48,18 @@ python -m src.evaluate.cli run \
   --qrels data/qrels/qrels.csv \
   --index-dir data/index \
   --output-dir data/qrels
+
+### web UI
+
+python -m src.app.cli serve \
+  --index-dir data/index \
+  --host 127.0.0.1 \
+  --port 5000 \
+  --default-ranker bm25 \
+  --warmup
+
+# then open http://127.0.0.1:5000/ in your browser
+# routes:
+#   /             home
+#   /search?q=... single-ranker results (q, ranker, k)
+#   /compare?q=...side-by-side compare across all rankers

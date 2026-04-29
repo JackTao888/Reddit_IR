@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Compare &mdash; {{ query }}{% endblock %}
+{% block content %}
+  {% if not query %}
+    <p class="empty">Enter a query above to compare rankers side-by-side.</p>
+  {% else %}
+    <p class="meta">
+      Side-by-side top <strong>{{ top_k }}</strong> for <strong>{{ query }}</strong>:
+    </p>
+    <div class="compare-columns">
+      {% for col in columns %}
+        <div class="compare-column">
+          <h3>{{ col.name }}</h3>
+          {% if col.results %}
+            <ol>
+              {% for r in col.results %}
+                <li>
+                  <a href="https://reddit.com{{ r.meta.permalink }}" target="_blank" rel="noopener">{{ r.meta.title }}</a>
+                  <div class="muted">
+                    r/{{ r.meta.subreddit }} &middot; score <code>{{ "%.3f"|format(r.score) }}</code>
+                  </div>
+                </li>
+              {% endfor %}
+            </ol>
+          {% else %}
+            <p class="empty">no results</p>
+          {% endif %}
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+{% endblock %}
