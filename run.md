@@ -1,3 +1,7 @@
+### csv → raw JSONL (when using bundled `dataset/*.csv` only)
+
+python scripts/csv_to_raw_jsonl.py --input-dir dataset --output-dir data/raw
+
 ### crawler
 
 python -m src.crawler.cli \
@@ -22,10 +26,10 @@ python -m src.index.cli stats --index-dir data/index
 
 ### search
 
-python -m src.rankers.cli search --query "python async websocket" --ranker bm25
-python -m src.rankers.cli search --query "python guide" --ranker tfidf --top-k 5
-python -m src.rankers.cli search --query "climate" --ranker bm25 --field-aware
-python -m src.rankers.cli search --ranker bm25 --field-aware    # interactive
+python -m src.rankers.cli search --index-dir data/index --query "python async websocket" --ranker bm25
+python -m src.rankers.cli search --index-dir data/index --query "python guide" --ranker tfidf --top-k 5
+python -m src.rankers.cli search --index-dir data/index --query "climate" --ranker bm25 --field-aware
+python -m src.rankers.cli search --index-dir data/index --ranker bm25 --field-aware    # interactive
 
 ### evaluate
 
