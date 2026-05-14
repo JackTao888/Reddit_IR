@@ -162,6 +162,23 @@ mark {
 
 .meta { color: #444; font-size: 13px; margin-bottom: 14px; }
 
+.meta-with-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px 16px;
+}
+
+.export-actions {
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.export-json-link {
+  font-weight: 500;
+}
+
 .compare-columns {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));

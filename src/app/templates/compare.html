@@ -4,8 +4,15 @@
   {% if not query %}
     <p class="empty">Enter a query above to compare rankers side-by-side.</p>
   {% else %}
-    <p class="meta">
-      Side-by-side top <strong>{{ top_k }}</strong> for <strong>{{ query }}</strong>:
+    <p class="meta meta-with-actions">
+      <span>
+        Side-by-side top <strong>{{ top_k }}</strong> for <strong>{{ query }}</strong>:
+      </span>
+      <span class="export-actions">
+        <a class="export-json-link" href="{{ url_for('main.compare_export', q=query, k=top_k, download=1) }}">Download JSON</a>
+        <span class="muted">&middot;</span>
+        <a class="export-json-link" href="{{ url_for('main.compare_export', q=query, k=top_k) }}">Open JSON</a>
+      </span>
     </p>
     <div class="compare-columns">
       {% for col in columns %}

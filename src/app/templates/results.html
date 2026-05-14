@@ -5,10 +5,22 @@
     <p class="empty">Enter a query above to search.</p>
   {% elif not results %}
     <p class="empty">No results for <strong>{{ query }}</strong> using <code>{{ current_ranker }}</code>.</p>
+    <p class="meta export-actions">
+      <a class="export-json-link" href="{{ url_for('main.search_export', q=query, ranker=current_ranker, k=top_k, download=1) }}">Download JSON</a>
+      <span class="muted">&middot;</span>
+      <a class="export-json-link" href="{{ url_for('main.search_export', q=query, ranker=current_ranker, k=top_k) }}">Open JSON</a>
+    </p>
   {% else %}
-    <p class="meta">
-      Top <strong>{{ results|length }}</strong> results from
-      <code>{{ current_ranker }}</code> for <strong>{{ query }}</strong>.
+    <p class="meta meta-with-actions">
+      <span>
+        Top <strong>{{ results|length }}</strong> results from
+        <code>{{ current_ranker }}</code> for <strong>{{ query }}</strong>.
+      </span>
+      <span class="export-actions">
+        <a class="export-json-link" href="{{ url_for('main.search_export', q=query, ranker=current_ranker, k=top_k, download=1) }}">Download JSON</a>
+        <span class="muted">&middot;</span>
+        <a class="export-json-link" href="{{ url_for('main.search_export', q=query, ranker=current_ranker, k=top_k) }}">Open JSON</a>
+      </span>
     </p>
     <ol class="results">
       {% for r in results %}

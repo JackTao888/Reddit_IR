@@ -122,6 +122,45 @@ def test_unknown_ranker_returns_400(client):
     assert r.status_code == 400
 
 
+def test_search_export_json(client):
+    r = client.get("/search/export?q=python&ranker=bm25_plain&k=10")
+    assert r.status_code == 200
+    assert r.content_type.startswith("application/json")
+    data = r.get_json()
+    assert data["query"] == "python"
+    assert data["ranker"] == "bm25_plain"
+    assert data["top_k"] == 10
+    assert data["n_results"] >= 1
+    row = data["results"][0]
+    assert "rank" in row and "score" in row and "meta" in row
+    assert "snippet" in row
+    assert "<mark>" not in row["snippet"]
+    assert "title" in row["meta"]
+
+
+def test_search_export_download_header(client):
+    r = client.get("/search/export?q=python&ranker=bm25_plain&download=1")
+    assert r.status_code == 200
+    assert "attachment" in r.headers.get("Content-Disposition", "")
+
+
+def test_search_export_unknown_ranker_400(client):
+    r = client.get("/search/export?q=python&ranker=nope")
+    assert r.status_code == 400
+
+
+def test_compare_export_json(client):
+    from src.rankers.registry import DEFAULT_RANKER_NAMES
+
+    r = client.get("/compare/export?q=python&k=10")
+    assert r.status_code == 200
+    data = r.get_json()
+    assert data["query"] == "python"
+    assert set(data["rankers"]) == set(DEFAULT_RANKER_NAMES)
+    for name in DEFAULT_RANKER_NAMES:
+        assert isinstance(data["rankers"][name], list)
+
+
 def test_top_k_clamps_to_max(client, app):
     huge = app.config["APP_CONFIG"].max_top_k + 100
     r = client.get(f"/search?q=python&k={huge}")
