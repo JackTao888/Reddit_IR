@@ -11,16 +11,22 @@ from .highlight import make_snippet
 
 main = Blueprint("main", __name__)
 
+# UI + URL only allow these top-k values (must be ≤ AppConfig.max_top_k).
+_ALLOWED_TOP_K = (10, 20, 30)
+
 
 def _clamp_top_k(raw: str | None) -> int:
     cfg = current_app.config["APP_CONFIG"]
+    default = cfg.default_top_k if cfg.default_top_k in _ALLOWED_TOP_K else _ALLOWED_TOP_K[0]
     if raw is None:
-        return cfg.default_top_k
+        return default
     try:
         k = int(raw)
     except (TypeError, ValueError):
-        return cfg.default_top_k
-    return max(1, min(k, cfg.max_top_k))
+        return default
+    if k in _ALLOWED_TOP_K:
+        return k
+    return default
 
 
 def _enrich_results(results, query: str, *, with_snippet: bool):
@@ -46,6 +52,7 @@ def index():
         "index.html",
         query="",
         current_ranker=cfg.default_ranker,
+        current_top_k=cfg.default_top_k,
     )
 
 
@@ -72,6 +79,7 @@ def search():
         query=query,
         current_ranker=ranker_name,
         top_k=top_k,
+        current_top_k=top_k,
         results=enriched,
     )
 
@@ -101,5 +109,6 @@ def compare():
         query=query,
         current_ranker=cfg.default_ranker,
         top_k=top_k,
+        current_top_k=top_k,
         columns=columns,
     )

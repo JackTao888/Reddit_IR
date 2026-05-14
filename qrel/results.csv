@@ -1,0 +1,55 @@
+ranker,qid,query,P@5,NDCG@5,P@10,NDCG@10,AP,n_relevant,retrieved_at_k
+tfidf,q1,minecraft shader first person hand invisible glitch,1.0,1.0,1.0,1.0,0.3571,28,10
+tfidf,q2,league of legends champion pick ranked advice,1.0,1.0,1.0,1.0,0.4545,22,10
+tfidf,q3,skyrim mod load order crash fix,1.0,1.0,1.0,1.0,0.4545,22,10
+tfidf,q4,dota 2 last hitting lane creep timing,0.6,0.6844,0.4,0.5104,0.3044,10,10
+tfidf,q5,climate change evidence peer reviewed study,0.4,0.5531,0.5,0.5704,0.1944,18,10
+tfidf,q6,explain like im five how vaccines work,0.4,0.3601,0.5,0.4427,0.108,23,10
+tfidf,q7,black hole event horizon telescope image,1.0,1.0,0.9,0.9216,0.2582,33,10
+tfidf,q8,world news election congress foreign policy,1.0,1.0,0.9,0.9337,0.356,25,10
+tfidf,q9,breaking bad walter white ending theory,1.0,1.0,1.0,1.0,0.3125,32,10
+tfidf,q10,game of thrones iron throne season finale,1.0,1.0,1.0,1.0,0.3704,27,10
+tfidf,q11,doctor who tardis regeneration episode,1.0,1.0,1.0,1.0,0.2778,36,10
+tfidf,q12,star wars sequel trilogy lightsaber fight,1.0,1.0,1.0,1.0,0.3226,31,10
+tfidf,q13,anime season recommendation slice of life,0.8,0.786,0.7,0.7133,0.2523,21,10
+tfidf,q14,meal prep budget cheap healthy recipes,0.4,0.5087,0.2,0.3794,0.2083,8,10
+tfidf,q15,life hack organize small apartment storage,1.0,1.0,1.0,1.0,0.4,25,10
+tfidf,q16,dad joke pun one liner funny,0.8,0.8539,0.9,0.9052,0.3136,26,10
+tfidf,q17,today i learned historical fact surprising,1.0,1.0,0.6,0.7273,0.375,16,10
+tfidf,q18,harry potter house sorting quiz discussion,0.6,0.6399,0.6,0.6243,0.1877,22,10
+bm25,q1,minecraft shader first person hand invisible glitch,1.0,1.0,1.0,1.0,0.3571,28,10
+bm25,q2,league of legends champion pick ranked advice,1.0,1.0,0.9,0.9337,0.4045,22,10
+bm25,q3,skyrim mod load order crash fix,1.0,1.0,1.0,1.0,0.4545,22,10
+bm25,q4,dota 2 last hitting lane creep timing,0.4,0.5087,0.3,0.3964,0.2,10,10
+bm25,q5,climate change evidence peer reviewed study,1.0,1.0,0.8,0.8572,0.421,18,10
+bm25,q6,explain like im five how vaccines work,0.8,0.8304,0.7,0.7472,0.25,23,10
+bm25,q7,black hole event horizon telescope image,1.0,1.0,1.0,1.0,0.303,33,10
+bm25,q8,world news election congress foreign policy,0.8,0.8539,0.6,0.7059,0.2196,25,10
+bm25,q9,breaking bad walter white ending theory,1.0,1.0,1.0,1.0,0.3125,32,10
+bm25,q10,game of thrones iron throne season finale,1.0,1.0,1.0,1.0,0.3704,27,10
+bm25,q11,doctor who tardis regeneration episode,1.0,1.0,0.9,0.9266,0.2407,36,10
+bm25,q12,star wars sequel trilogy lightsaber fight,1.0,1.0,1.0,1.0,0.3226,31,10
+bm25,q13,anime season recommendation slice of life,0.4,0.4704,0.7,0.6563,0.2125,21,10
+bm25,q14,meal prep budget cheap healthy recipes,0.2,0.3392,0.3,0.4104,0.1982,8,10
+bm25,q15,life hack organize small apartment storage,1.0,1.0,1.0,1.0,0.4,25,10
+bm25,q16,dad joke pun one liner funny,1.0,1.0,0.8,0.8701,0.3077,26,10
+bm25,q17,today i learned historical fact surprising,0.6,0.7227,0.6,0.6902,0.3207,16,10
+bm25,q18,harry potter house sorting quiz discussion,0.8,0.8304,0.7,0.7382,0.2519,22,10
+bm25_field,q1,minecraft shader first person hand invisible glitch,0.8,0.6608,0.5,0.5072,0.1268,28,10
+bm25_field,q2,league of legends champion pick ranked advice,0.6,0.7227,0.7,0.7538,0.265,22,10
+bm25_field,q3,skyrim mod load order crash fix,1.0,1.0,1.0,1.0,0.4545,22,10
+bm25_field,q4,dota 2 last hitting lane creep timing,0.0,0.0,0.0,0.0,0.0,10,10
+bm25_field,q5,climate change evidence peer reviewed study,0.8,0.786,0.8,0.7949,0.3657,18,10
+bm25_field,q6,explain like im five how vaccines work,0.6,0.6844,0.3,0.4441,0.113,23,10
+bm25_field,q7,black hole event horizon telescope image,0.8,0.786,0.9,0.8611,0.2294,33,10
+bm25_field,q8,world news election congress foreign policy,1.0,1.0,0.8,0.8669,0.3156,25,10
+bm25_field,q9,breaking bad walter white ending theory,1.0,1.0,0.6,0.7152,0.1771,32,10
+bm25_field,q10,game of thrones iron throne season finale,0.4,0.3452,0.4,0.3539,0.0605,27,10
+bm25_field,q11,doctor who tardis regeneration episode,1.0,1.0,0.9,0.9364,0.25,36,10
+bm25_field,q12,star wars sequel trilogy lightsaber fight,0.6,0.6844,0.6,0.6653,0.1526,31,10
+bm25_field,q13,anime season recommendation slice of life,0.6,0.7227,0.3,0.469,0.1429,21,10
+bm25_field,q14,meal prep budget cheap healthy recipes,0.2,0.3392,0.2,0.3291,0.1528,8,10
+bm25_field,q15,life hack organize small apartment storage,1.0,1.0,1.0,1.0,0.4,25,10
+bm25_field,q16,dad joke pun one liner funny,0.8,0.8539,0.5,0.6325,0.1782,26,10
+bm25_field,q17,today i learned historical fact surprising,0.4,0.5531,0.5,0.568,0.2178,16,10
+bm25_field,q18,harry potter house sorting quiz discussion,0.6,0.7227,0.4,0.5326,0.1545,22,10

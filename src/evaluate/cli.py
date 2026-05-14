@@ -68,9 +68,14 @@ def build_parser() -> argparse.ArgumentParser:
     sub = p.add_subparsers(dest="command", required=True)
 
     pp = sub.add_parser("pool", help="Generate a labeling pool from queries + index.")
-    pp.add_argument("--queries", type=Path, required=True)
+    pp.add_argument(
+        "--queries",
+        type=Path,
+        default=Path("qrel/queries.json"),
+        help="Query set JSON (default: qrel/queries.json).",
+    )
     pp.add_argument("--index-dir", type=Path, default=Path("data/index"))
-    pp.add_argument("--output", type=Path, default=Path("data/qrels/pool.csv"))
+    pp.add_argument("--output", type=Path, default=Path("qrel/pool.csv"))
     pp.add_argument("--depth", type=int, default=DEFAULT_POOL_DEPTH)
     pp.add_argument("--seed", type=int, default=DEFAULT_SHUFFLE_SEED)
     pp.add_argument(
@@ -81,10 +86,15 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
     pr = sub.add_parser("run", help="Compute metrics from a labeled qrels CSV.")
-    pr.add_argument("--queries", type=Path, required=True)
-    pr.add_argument("--qrels", type=Path, required=True)
+    pr.add_argument(
+        "--queries",
+        type=Path,
+        default=Path("qrel/queries.json"),
+        help="Query set JSON (default: qrel/queries.json).",
+    )
+    pr.add_argument("--qrels", type=Path, required=True, help="Labeled pool CSV (e.g. qrel/qrels.csv).")
     pr.add_argument("--index-dir", type=Path, default=Path("data/index"))
-    pr.add_argument("--output-dir", type=Path, default=Path("data/qrels"))
+    pr.add_argument("--output-dir", type=Path, default=Path("qrel"))
     pr.add_argument("--top-k", type=int, default=DEFAULT_TOP_K)
     pr.add_argument(
         "--rankers",
@@ -109,10 +119,10 @@ def _cmd_pool(args: argparse.Namespace) -> int:
     )
     save_pool_csv(rows, args.output)
     print(f"Wrote pool with {len(rows)} rows to {args.output}")
-    print("Edit the 'label' column (1 = relevant, 0/blank = not relevant), then run:")
+    print("Edit the 'label' column (1 = relevant, 0/blank = not relevant), then save as qrel/qrels.csv and run:")
     print(
         f"  python -m src.evaluate.cli run --queries {args.queries} "
-        f"--qrels {args.output} --index-dir {args.index_dir}"
+        f"--qrels qrel/qrels.csv --index-dir {args.index_dir}"
     )
     return 0
 

@@ -33,37 +33,45 @@ python -m src.rankers.cli search --index-dir data/index --ranker bm25 --field-aw
 
 ### evaluate
 
-# 1. write data/qrels/queries.json with 15-20 queries:
-#    {"queries": [{"qid": "q1", "text": "..."}, ...]}
+# 1. edit qrel/queries.json with 15-20 queries (or use the bundled file):
 
-# 2. generate pool template
+# {"queries": [{"qid": "q1", "text": "..."}, ...]}
+
+# 2. generate pool template (defaults: pool -> qrel/pool.csv, run outputs -> qrel/)
+
 python -m src.evaluate.cli pool \
-  --queries data/qrels/queries.json \
+  --queries qrel/queries.json \
   --index-dir data/index \
-  --output data/qrels/pool.csv \
+  --output qrel/pool.csv \
   --depth 20
 
-# 3. open data/qrels/pool.csv, fill the 'label' column (1=relevant, blank/0=not),
-#    save as data/qrels/qrels.csv (or overwrite pool.csv).
+# 3. open qrel/pool.csv, fill the 'label' column (1=relevant, blank/0=not),
+
+# save as qrel/qrels.csv (or copy pool.csv to qrels.csv after labeling).
 
 # 4. compute metrics for all rankers
+
 python -m src.evaluate.cli run \
-  --queries data/qrels/queries.json \
-  --qrels data/qrels/qrels.csv \
+  --queries qrel/queries.json \
+  --qrels qrel/qrels.csv \
   --index-dir data/index \
-  --output-dir data/qrels
+  --output-dir qrel
 
 ### web UI
 
 python -m src.app.cli serve \
   --index-dir data/index \
   --host 127.0.0.1 \
-  --port 5000 \
+  --port 8080 \
   --default-ranker bm25 \
   --warmup
 
-# then open http://127.0.0.1:5000/ in your browser
+# then open http://127.0.0.1:8080/ in your browser
+
 # routes:
-#   /             home
-#   /search?q=... single-ranker results (q, ranker, k)
-#   /compare?q=...side-by-side compare across all rankers
+
+# /             home
+
+# /search?q=... single-ranker results (q, ranker, k)
+
+# /compare?q=...side-by-side compare across all rankers

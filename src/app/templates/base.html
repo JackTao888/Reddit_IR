@@ -27,9 +27,14 @@
           <option value="{{ r }}" {% if r == current_ranker %}selected{% endif %}>{{ r }}</option>
         {% endfor %}
       </select>
+      <select name="k" aria-label="Number of results (top K)" title="Top K">
+        {% for kk in (10, 20, 30) %}
+          <option value="{{ kk }}" {% if kk == (current_top_k|default(10)) %}selected{% endif %}>Top {{ kk }}</option>
+        {% endfor %}
+      </select>
       <button type="submit">Search</button>
       {% if query %}
-        <a class="compare-link" href="{{ url_for('main.compare', q=query) }}">Compare all rankers &rarr;</a>
+        <a class="compare-link" href="{{ url_for('main.compare', q=query, k=current_top_k|default(10)) }}">Compare all rankers &rarr;</a>
       {% endif %}
     </form>
   </section>
