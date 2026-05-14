@@ -14,13 +14,12 @@ from typing import List, Tuple
 
 from ..index.store import load_artifacts
 from ..rankers.base import BaseRanker
-from ..rankers.bm25_ranker import (
-    DEFAULT_B,
-    DEFAULT_FIELD_WEIGHTS,
-    DEFAULT_K1,
-    Bm25Ranker,
+from ..rankers.registry import (
+    DEFAULT_RANKER_NAMES,
+    build_ranker,
+    canonical_ranker_name,
+    is_known_ranker,
 )
-from ..rankers.tfidf_ranker import TfidfRanker
 from .config import DEFAULT_POOL_DEPTH, DEFAULT_SHUFFLE_SEED, DEFAULT_TOP_K
 from .pool import generate_pool
 from .qrels import load_qrels_csv, save_pool_csv
@@ -28,30 +27,20 @@ from .queries import load_queries
 from .runner import format_summary_table, run_evaluation, write_results_csvs
 
 
-_VALID_RANKER_NAMES = {"tfidf", "bm25", "bm25_field"}
-
-
-def _build_default_rankers(artifacts, names: List[str]) -> List[Tuple[str, BaseRanker]]:
+def _build_rankers_from_names(artifacts, names: List[str]) -> List[Tuple[str, BaseRanker]]:
     out: List[Tuple[str, BaseRanker]] = []
-    for n in names:
-        if n == "tfidf":
-            out.append((n, TfidfRanker(artifacts)))
-        elif n == "bm25":
-            out.append((n, Bm25Ranker(artifacts, k1=DEFAULT_K1, b=DEFAULT_B)))
-        elif n == "bm25_field":
-            out.append(
-                (
-                    n,
-                    Bm25Ranker(
-                        artifacts,
-                        k1=DEFAULT_K1,
-                        b=DEFAULT_B,
-                        field_weights=DEFAULT_FIELD_WEIGHTS,
-                    ),
-                )
+    seen: set[str] = set()
+    for raw in names:
+        if not is_known_ranker(raw):
+            raise ValueError(
+                f"Unknown ranker: {raw!r}. Choose from {list(DEFAULT_RANKER_NAMES)} "
+                f"(legacy: tfidf, bm25)."
             )
-        else:
-            raise ValueError(f"Unknown ranker: {n}")
+        key = canonical_ranker_name(raw)
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append((key, build_ranker(key, artifacts)))
     return out
 
 
@@ -81,8 +70,8 @@ def build_parser() -> argparse.ArgumentParser:
     pp.add_argument(
         "--rankers",
         nargs="+",
-        default=["tfidf", "bm25", "bm25_field"],
-        help=f"Rankers to pool from. Choose from {sorted(_VALID_RANKER_NAMES)}.",
+        default=list(DEFAULT_RANKER_NAMES),
+        help=f"Rankers to pool from. Choose from {list(DEFAULT_RANKER_NAMES)} (legacy: tfidf, bm25).",
     )
 
     pr = sub.add_parser("run", help="Compute metrics from a labeled qrels CSV.")
@@ -92,15 +81,20 @@ def build_parser() -> argparse.ArgumentParser:
         default=Path("qrel/queries.json"),
         help="Query set JSON (default: qrel/queries.json).",
     )
-    pr.add_argument("--qrels", type=Path, required=True, help="Labeled pool CSV (e.g. qrel/qrels.csv).")
+    pr.add_argument(
+        "--qrels",
+        type=Path,
+        required=True,
+        help="Labeled pool CSV (e.g. qrel/qrels.csv).",
+    )
     pr.add_argument("--index-dir", type=Path, default=Path("data/index"))
     pr.add_argument("--output-dir", type=Path, default=Path("qrel"))
     pr.add_argument("--top-k", type=int, default=DEFAULT_TOP_K)
     pr.add_argument(
         "--rankers",
         nargs="+",
-        default=["tfidf", "bm25", "bm25_field"],
-        help=f"Rankers to evaluate. Choose from {sorted(_VALID_RANKER_NAMES)}.",
+        default=list(DEFAULT_RANKER_NAMES),
+        help=f"Rankers to evaluate. Choose from {list(DEFAULT_RANKER_NAMES)} (legacy: tfidf, bm25).",
     )
 
     return p
@@ -109,7 +103,7 @@ def build_parser() -> argparse.ArgumentParser:
 def _cmd_pool(args: argparse.Namespace) -> int:
     artifacts = load_artifacts(args.index_dir)
     queries = load_queries(args.queries)
-    rankers = _build_default_rankers(artifacts, args.rankers)
+    rankers = _build_rankers_from_names(artifacts, args.rankers)
     rows = generate_pool(
         artifacts,
         rankers,
@@ -119,7 +113,9 @@ def _cmd_pool(args: argparse.Namespace) -> int:
     )
     save_pool_csv(rows, args.output)
     print(f"Wrote pool with {len(rows)} rows to {args.output}")
-    print("Edit the 'label' column (1 = relevant, 0/blank = not relevant), then save as qrel/qrels.csv and run:")
+    print(
+        "Edit the 'label' column (1 = relevant, 0/blank = not relevant), then save as qrel/qrels.csv and run:"
+    )
     print(
         f"  python -m src.evaluate.cli run --queries {args.queries} "
         f"--qrels qrel/qrels.csv --index-dir {args.index_dir}"
@@ -131,7 +127,7 @@ def _cmd_run(args: argparse.Namespace) -> int:
     artifacts = load_artifacts(args.index_dir)
     queries = load_queries(args.queries)
     qrels = load_qrels_csv(args.qrels)
-    rankers = _build_default_rankers(artifacts, args.rankers)
+    rankers = _build_rankers_from_names(artifacts, args.rankers)
 
     results = run_evaluation(rankers, queries, qrels, top_k=args.top_k)
     per_query_path, summary_path = write_results_csvs(results, args.output_dir)

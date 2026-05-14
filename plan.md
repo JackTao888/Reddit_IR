@@ -76,6 +76,10 @@ finalProject/
       query.py
       tfidf_ranker.py
       bm25_ranker.py
+      two_stage_ranker.py
+      lsi_ranker.py
+      prf_ranker.py
+      registry.py
       cli.py
     evaluate/
       __init__.py
@@ -508,9 +512,10 @@ Porting these avoids re-inventing solved components and directly improves both e
 - Field-aware mode runs the same formula on each per-field index and weights the sums.
 
 **CLI contract**
-- `python -m src.rankers.cli search --query "python async websocket" --top-k 10 --ranker bm25`
-- `--ranker {tfidf,bm25}` chooses the model; BM25 accepts `--k1`, `--b`, and
-  `--field-aware` plus `--w-title --w-body --w-comments`.
+- `python -m src.rankers.cli search --query "python async websocket" --top-k 10 --ranker bm25_plain`
+- `--ranker` chooses among `tfidf_cosine`, `tfidf_dice`, `tfidf_jaccard`, `tfidf_overlap`, `bm25_plain`, `bm25_field`, `bm25_prf`, `twostage_bm25_tfidf`, `lsi` (plus legacy `tfidf` / `bm25` aliases). Default eval matrix omits `tfidf_overlap`.
+- BM25 accepts `--k1`, `--b`, and `--field-aware` (shorthand for `bm25_field`) plus `--w-title --w-body --w-comments`.
+- Two-stage accepts `--stage1-k` (BM25 candidate pool size before TF-IDF rerank; default 200).
 - `--index-dir` defaults to `data/index`.
 - Without `--query`, reads queries interactively from stdin.
 
@@ -556,7 +561,11 @@ Porting these avoids re-inventing solved components and directly improves both e
 - Static: `/static/style.css`
 
 **Available rankers (UI)**
-- `tfidf`, `bm25`, `bm25_field` — same as evaluation defaults.
+- **TF-IDF family:** `tfidf_cosine`, `tfidf_dice`, `tfidf_jaccard`. `tfidf_overlap` exists in code but is **excluded from defaults** on long-document Reddit text; pass ``--rankers tfidf_overlap`` to try it.
+- **BM25 family:** `bm25_plain`, `bm25_field`, `bm25_prf` (pseudo-relevance feedback from top-hit text).
+- **Two-stage:** `twostage_bm25_tfidf` (BM25-plain candidate pool, then TF-IDF cosine rerank).
+- **LSI:** `lsi` (truncated SVD; requires **SciPy** installed — first load factorizes the corpus matrix, can take several seconds on large indexes).
+- Legacy aliases on search/eval CLI: `tfidf`→`tfidf_cosine`, `bm25`→`bm25_plain`.
 
 **Snippet rendering**
 - Reuses the index's preprocessing metadata to stem each candidate word in the
@@ -569,7 +578,7 @@ Porting these avoids re-inventing solved components and directly improves both e
 - `--host`, `--debug` available for local dev.
 
 **Completion criteria**
-- App starts in < 5s with a 10k-doc index.
+- App starts in < 5s with a 10k-doc index for **sparse** rankers; **LSI** may add several seconds on first request (or use ``--warmup`` to pay cost at startup).
 - Search round-trips query and ranker selection in the URL (shareable links).
 - Empty query and OOV query render gracefully (no 500s).
 - All templates render with a fresh app + tiny synthetic index in tests.
@@ -625,10 +634,22 @@ Porting these avoids re-inventing solved components and directly improves both e
 - `mean_*` aggregators across queries
 
 **Default ranker matrix**
-- `tfidf` — TF-IDF cosine
-- `bm25` — plain BM25 (k1=1.5, b=0.75)
+- `tfidf_cosine` — TF-IDF weights, cosine similarity (L2 norms)
+- `tfidf_dice`, `tfidf_jaccard` — same TF-IDF term weights, Dice / Jaccard similarity (full-doc L1 mass in denominators; HW2-style)
+- `tfidf_overlap` — same weights with Overlap; **not in the default eval matrix** (long Reddit bodies inflate document mass and crush scores); still available via ``--rankers tfidf_overlap`` for ablations
+- `bm25_plain` — plain BM25 on the `all` index (k1=1.5, b=0.75)
 - `bm25_field` — field-aware BM25 (default weights from M5)
-- Customizable via `--rankers` flag.
+- `twostage_bm25_tfidf` — BM25-plain top-200 (configurable) candidates, reranked by `tfidf_cosine`
+- `lsi` — **LSI / truncated SVD** on a TF–IDF sparse term–document matrix (``scipy.sparse.linalg.svds``), cosine in *k*-dimensional latent space; HW2 Extension 9 style (co-occurrence smoothing, not neural semantics). Falls back to `bm25_plain` if the matrix is too small or SVD fails.
+- `bm25_prf` — **pseudo-relevance feedback**: BM25 → pool text from top-R hits → extract expansion terms with the same preprocessing → second BM25 pass (still lexical, but query expansion from implicit relevance).
+- Customizable via `--rankers` flag; pool/run defaults include eight rankers (all supported except `tfidf_overlap`).
+
+**Other semantic directions (not implemented in-repo; good for writeup / future work)**
+- **Cross-encoder reranking** — tiny transformer scores (query, document) pairs on the BM25 top-N; strong semantics, slow without GPU batching.
+- **Dense bi-encoder retrieval** — embed query and docs (e.g. sentence-transformers), ANN index (FAISS/HNSW); true semantic matching, different infra from sparse index.
+- **Hybrid sparse + dense** — reciprocal rank fusion (RRF) of BM25 and dense lists; industry default for “semantic search.”
+- **SPLADE / learned sparse** — neural sparse vectors; still inverted-index friendly but needs training/inference stack.
+- **LLM query expansion** — paraphrase or generate sub-queries; policy/API constraints for a course project.
 
 **CLI contract**
 - `python -m src.evaluate.cli pool --queries q.json --index-dir data/index --output pool.csv --depth 20`

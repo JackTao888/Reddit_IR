@@ -68,7 +68,7 @@ def app(tmp_path):
     artifacts = build_artifacts(cfg)
     save_artifacts(artifacts, tmp_path / "index")
 
-    app_cfg = AppConfig(index_dir=tmp_path / "index", default_ranker="bm25")
+    app_cfg = AppConfig(index_dir=tmp_path / "index", default_ranker="bm25_plain")
     app = create_app(app_cfg)
     app.config["TESTING"] = True
     return app
@@ -107,11 +107,13 @@ def test_search_oov_query_shows_no_results(client):
     assert b"No results" in r.data
 
 
-def test_compare_page_shows_three_ranker_columns(client):
+def test_compare_page_lists_all_default_rankers(client):
+    from src.rankers.registry import DEFAULT_RANKER_NAMES
+
     r = client.get("/compare?q=python")
     assert r.status_code == 200
     body = r.data.decode("utf-8")
-    for ranker_name in ("tfidf", "bm25", "bm25_field"):
+    for ranker_name in DEFAULT_RANKER_NAMES:
         assert ranker_name in body
 
 

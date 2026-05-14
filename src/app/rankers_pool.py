@@ -10,11 +10,7 @@ from typing import Dict, List
 
 from ..index.store import IndexArtifacts
 from ..rankers.base import BaseRanker
-from ..rankers.bm25_ranker import DEFAULT_FIELD_WEIGHTS, Bm25Ranker
-from ..rankers.tfidf_ranker import TfidfRanker
-
-
-_AVAILABLE = ("tfidf", "bm25", "bm25_field")
+from ..rankers.registry import DEFAULT_RANKER_NAMES, build_ranker
 
 
 class RankerPool:
@@ -23,27 +19,20 @@ class RankerPool:
         self._cache: Dict[str, BaseRanker] = {}
 
     def get(self, name: str) -> BaseRanker:
-        if name not in _AVAILABLE:
+        if name not in DEFAULT_RANKER_NAMES:
             raise KeyError(name)
         cached = self._cache.get(name)
         if cached is not None:
             return cached
-
-        if name == "tfidf":
-            ranker: BaseRanker = TfidfRanker(self.artifacts)
-        elif name == "bm25":
-            ranker = Bm25Ranker(self.artifacts)
-        else:  # bm25_field
-            ranker = Bm25Ranker(self.artifacts, field_weights=DEFAULT_FIELD_WEIGHTS)
-
+        ranker = build_ranker(name, self.artifacts)
         self._cache[name] = ranker
         return ranker
 
     @property
     def available(self) -> List[str]:
-        return list(_AVAILABLE)
+        return list(DEFAULT_RANKER_NAMES)
 
     def warmup(self) -> None:
         """Eagerly construct every ranker (e.g., before serving traffic)."""
-        for name in _AVAILABLE:
+        for name in DEFAULT_RANKER_NAMES:
             self.get(name)

@@ -10,6 +10,7 @@ import argparse
 import logging
 from pathlib import Path
 
+from ..rankers.registry import DEFAULT_RANKER_NAMES
 from .app_factory import create_app
 from .config import AppConfig
 
@@ -33,8 +34,8 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--debug", action="store_true")
     s.add_argument(
         "--default-ranker",
-        choices=["tfidf", "bm25", "bm25_field"],
-        default="bm25",
+        choices=list(DEFAULT_RANKER_NAMES),
+        default="bm25_plain",
     )
     s.add_argument("--top-k", type=int, default=10)
     s.add_argument("--max-top-k", type=int, default=50)

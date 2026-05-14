@@ -1,0 +1,444 @@
+\UseRawInputEncoding
+\documentclass[11pt]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{float}
+\usepackage{array}
+\usepackage{amsmath}
+\usepackage{framed}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue,
+    urlcolor=blue,
+    citecolor=blue
+}
+
+\lstset{
+    basicstyle=\ttfamily\small,
+    breaklines=true,
+    frame=single,
+    columns=fullflexible,
+    keepspaces=true
+}
+
+\newcommand{\screenshotbox}[2]{%
+\begin{figure}[H]
+    \centering
+    \IfFileExists{#1}{%
+        \includegraphics[width=0.88\textwidth]{#1}%
+    }{%
+        \fbox{\parbox[c][2.1in][c]{0.88\textwidth}{\centering Screenshot placeholder: \texttt{#1}}}%
+    }%
+    \caption{#2}%
+\end{figure}
+}
+
+\title{Reddit\_IR: Reddit Thread Retrieval and Ranking Engine}
+\author{
+    Ruijie Tao, Section 601.666, \texttt{rtao12@jh.edu} \\
+    Juntong Xu, Section 601.666, \texttt{jxu216@jh.edu}
+}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\begin{center}
+\textbf{Project Repository:} \url{https://github.com/JackTao888/Reddit_IR}
+\end{center}
+
+\section*{Project Summary}
+Reddit\_IR is a Reddit-focused information retrieval system that builds a searchable corpus from Reddit posts and comments. The system collects posts from selected subreddits, preprocesses noisy user-generated text, builds persistent inverted indexes, and supports ranked retrieval with TF-IDF cosine similarity, BM25, and field-aware BM25. It also includes a Flask web interface for query input, result browsing, and side-by-side ranker comparison.
+
+\section{Introduction and Motivation}
+Reddit contains a large amount of informal community knowledge, including technical advice, product discussions, personal experience, and domain-specific explanations. However, Reddit content is difficult to search well because relevant information may appear in the post title, self-text, or comments, and the text often contains markdown, abbreviations, deleted-comment markers, URLs, and conversational noise.
+
+This project applies core information retrieval methods to this realistic setting. A user enters a free-text query and receives ranked Reddit threads from a multi-subreddit corpus. The project is relevant to the course because it combines web data collection, text preprocessing, inverted indexing, vector-space ranking, BM25 ranking, field weighting, and empirical evaluation.
+
+\section{System Architecture}
+The implemented system follows an end-to-end IR pipeline:
+
+\begin{enumerate}[label=(\arabic*)]
+    \item \textbf{Crawler}: Uses PRAW to collect Reddit submissions and top comments from selected subreddits. The output is saved as JSONL files.
+    \item \textbf{Preprocessor}: Converts raw Reddit records into normalized token streams using cleaning, tokenization, stopword removal, and stemming.
+    \item \textbf{Index builder}: Builds persistent inverted indexes over all text and over separate fields: title, body, and comments.
+    \item \textbf{Rankers}: Implements TF-IDF cosine similarity, BM25, and field-aware BM25 on top of the same index artifacts.
+    \item \textbf{Evaluation harness}: Generates pooled results, supports manual relevance labeling, and computes standard IR metrics.
+    \item \textbf{Flask UI}: Provides a local web interface for searching and comparing rankers.
+\end{enumerate}
+
+\section{Repository Structure}
+The repository is organized into modular packages under \texttt{src/}. The main files and directories are:
+
+\begin{lstlisting}
+Reddit_IR/
+├── dataset/
+│   └── *.csv
+├── scripts/
+│   └── csv_to_raw_jsonl.py
+├── src/
+│   ├── app/
+│   │   ├── app_factory.py
+│   │   ├── cli.py
+│   │   ├── config.py
+│   │   ├── highlight.py
+│   │   ├── rankers_pool.py
+│   │   ├── views.py
+│   │   ├── templates/
+│   │   └── static/
+│   ├── crawler/
+│   │   ├── checkpoint.py
+│   │   ├── cli.py
+│   │   ├── client.py
+│   │   ├── collectors.py
+│   │   ├── config.py
+│   │   ├── filters.py
+│   │   ├── runner.py
+│   │   └── serializers.py
+│   ├── evaluate/
+│   │   ├── cli.py
+│   │   ├── metrics.py
+│   │   ├── pool.py
+│   │   ├── qrels.py
+│   │   ├── queries.py
+│   │   └── runner.py
+│   ├── index/
+│   │   ├── builder.py
+│   │   ├── cli.py
+│   │   ├── inverted.py
+│   │   └── store.py
+│   ├── preprocess/
+│   │   ├── cli.py
+│   │   ├── config.py
+│   │   ├── pipeline.py
+│   │   ├── stopwords.py
+│   │   └── tokens.py
+│   ├── rankers/
+│   │   ├── base.py
+│   │   ├── bm25_ranker.py
+│   │   ├── cli.py
+│   │   ├── query.py
+│   │   └── tfidf_ranker.py
+│   └── __init__.py
+├── tests/
+├── .env.example
+├── 601.466.pr.pdf
+├── plan.md
+├── requirements.txt
+└── run.md
+\end{lstlisting}
+
+This layout separates data collection, preprocessing, indexing, ranking, evaluation, and interface code. The separation makes the project easier to test, maintain, and extend.
+
+\section{How to Run the Project}
+\label{sec:userguide}
+
+
+\noindent\textbf{Bundled data.}
+The submitted repository includes the \texttt{dataset/} folder (CSV exports only).
+It does \emph{not} include pre-built \texttt{data/raw}, \texttt{data/processed}, or
+\texttt{data/index}; those directories are created when you run the pipeline below.
+
+\subsection{Clone and install}
+\begin{lstlisting}[language=bash]
+git clone https://github.com/JackTao888/Reddit_IR.git
+cd Reddit_IR
+python -m venv .venv
+Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+\end{lstlisting}
+
+\noindent Main dependencies: \textbf{Flask} (web UI), \textbf{nltk} (optional but
+recommended for stemming/tokenization), \textbf{PRAW} and \textbf{python-dotenv}
+(only if you use the live Reddit crawler), and \textbf{pytest} (tests).
+
+\subsection{CSV to raw JSONL (required for the bundled \texttt{dataset/})}
+\begin{lstlisting}[language=bash]
+python scripts/csv_to_raw_jsonl.py --input-dir dataset --output-dir data/raw
+\end{lstlisting}
+\noindent Since Reddit API credentials were not available during the final test phase, we used an existing Reddit CSV dataset to test the program.
+
+
+\subsection{Preprocessing}
+\begin{lstlisting}[language=bash]
+python -m src.preprocess.cli --input data/raw --output data/processed --stemmer snowball
+\end{lstlisting}
+
+\subsection{Indexing}
+Build the inverted index (plain BM25 / TF--IDF use the \texttt{all} field; the
+indexer also builds per-field postings for field-aware BM25 in the web UI).
+Duplicate CSV rows with identical \texttt{(subreddit, post\_id, all\_tokens)}
+are skipped at build time so the document count matches unique logical threads:
+
+\begin{lstlisting}[language=bash]
+python -m src.index.cli build --input data/processed --output data/index
+
+python -m src.index.cli stats --index-dir data/index
+\end{lstlisting}
+
+\subsection{Command-line search}
+\texttt{python -m src.rankers.cli} supports \texttt{tfidf} and \texttt{bm25}.
+For field-aware BM25 (same idea as \texttt{bm25\_field} in the Flask UI), pass
+\texttt{--field-aware} with \texttt{--ranker bm25}:
+
+\begin{lstlisting}[language=bash]
+python -m src.rankers.cli search \
+  --index-dir data/index \
+  --query "python async websocket" \
+  --ranker bm25
+
+python -m src.rankers.cli search \
+  --index-dir data/index \
+  --query "python guide" \
+  --ranker tfidf \
+  --top-k 5
+
+python -m src.rankers.cli search \
+  --index-dir data/index \
+  --query "climate" \
+  --ranker bm25 \
+  --field-aware
+\end{lstlisting}
+
+\subsection{Web interface}
+Launch the Flask app (ranker names in the UI: \texttt{tfidf}, \texttt{bm25},
+\texttt{bm25\_field}). The flag \texttt{--warmup} eagerly loads all rankers at
+startup (optional, useful for smoother first query after a large index load):
+
+\begin{lstlisting}[language=bash]
+python -m src.app.cli serve --index-dir data/index --host 127.0.0.1 --port 8080 --default-ranker bm25 --warmup
+\end{lstlisting}
+
+\noindent Then open \url{http://127.0.0.1:8080/}. Relative \texttt{--index-dir
+data/index} is resolved against the \textbf{repository root} (not the shell's
+current directory). 
+
+\section{Data Collection}
+The project contains a PRAW-based crawler for live Reddit collection. However, for the final reproducible submission, the experiments use bundled CSV Reddit exports converted into the same raw JSONL. 
+
+\noindent The crawler package implements Reddit data collection through PRAW. It supports configurable subreddits, post limits, comment limits, sort modes, time filters, output directories, retries, checkpointing, and duplicate skipping.
+
+\noindent Each Reddit submission is saved as a JSONL record. A representative record contains:
+
+\begin{lstlisting}
+{
+  "doc_id": "science_t3_abc123",
+  "post_id": "abc123",
+  "subreddit": "science",
+  "title": "post title",
+  "selftext": "body text",
+  "top_comments": ["comment 1", "comment 2"],
+  "url": "https://www.reddit.com/...",
+  "permalink": "/r/science/comments/abc123/...",
+  "created_utc": 1714195200,
+  "score": 1532,
+  "num_comments": 147,
+  "over_18": false,
+  "is_self": true,
+  "retrieved_at": "2026-04-27T05:00:00Z"
+}
+\end{lstlisting}
+
+The crawler is designed to be polite and reproducible. It uses authenticated API access rather than raw HTML scraping, writes checkpoint information, skips posts that have already been seen, applies filtering rules, and records crawl statistics in a manifest. The runner also includes retry and backoff behavior and classifies errors such as rate-limit, authentication, network, parse, and unknown failures.
+
+\section{Preprocessing}
+The preprocessing package converts raw Reddit records into clean tokenized documents. It preserves original metadata for display while producing several token fields for retrieval. Each processed record includes \texttt{title\_tokens}, \texttt{body\_tokens}, \texttt{comments\_tokens}, \texttt{all\_tokens}, field lengths, and total document length.
+
+The preprocessing pipeline includes:
+
+\begin{itemize}
+    \item URL stripping and markdown cleaning;
+    \item removal of deleted or removed markers such as \texttt{[deleted]} and \texttt{[removed]};
+    \item tokenization with NLTK when available and a regex fallback when NLTK data is unavailable;
+    \item lowercasing;
+    \item stopword removal using English stopwords and Reddit-specific terms such as \texttt{tldr}, \texttt{op}, \texttt{edit}, \texttt{karma}, \texttt{upvote}, and \texttt{subreddit};
+    \item Snowball or Porter stemming;
+    \item document-length calculation for BM25 normalization.
+\end{itemize}
+
+A safety mechanism prevents non-removed posts from becoming completely empty after preprocessing by falling back to title tokens when all other tokens are filtered out.
+
+\section{Indexing}
+The indexing package builds an in-memory inverted index and persists it to disk. For each term, the index stores a postings dictionary mapping document IDs to term frequencies. It also stores document frequency, document length, total token count, vocabulary size, number of documents, and average document length.
+
+The index builder creates four field indexes:
+
+\begin{itemize}
+    \item \texttt{all}: title, body, and comments combined;
+    \item \texttt{title}: post title only;
+    \item \texttt{body}: self-text only;
+    \item \texttt{comments}: top comments only.
+\end{itemize}
+
+The index artifacts are saved as \texttt{index.pkl}, while human-readable corpus statistics and configuration are saved in \texttt{manifest.json}. The index store also keeps a document metadata table for result rendering, including title, subreddit, URL, permalink, Reddit score, excerpts, and field lengths.
+
+\section{Retrieval Models}
+\subsection{TF-IDF Cosine Similarity}
+The TF-IDF ranker is implemented directly on top of the inverted index. It does not require rebuilding a separate vectorizer at query time. The system computes IDF as:
+
+\begin{equation}
+    idf(t) = \log\left(\frac{N}{df(t)}\right),
+\end{equation}
+
+and uses sublinear term frequency weighting:
+
+\begin{equation}
+    w(t,d) = (1 + \log(tf(t,d))) \cdot idf(t).
+\end{equation}
+
+Document norms are precomputed once when the ranker is constructed. At query time, the ranker computes query weights, accumulates dot products for documents containing query terms, and returns ranked results by cosine similarity:
+
+\begin{equation}
+    \text{score}(q,d) = \frac{q \cdot d}{\|q\|\|d\|}.
+\end{equation}
+
+\subsection{BM25}
+The BM25 ranker is also implemented from scratch on top of the inverted index. It uses Lucene-style positive IDF:
+
+\begin{equation}
+    idf(t) = \log\left(\frac{N - df(t) + 0.5}{df(t) + 0.5} + 1\right),
+\end{equation}
+
+and the standard BM25 scoring function:
+
+\begin{equation}
+    \text{BM25}(q,d) = \sum_{t \in q} idf(t)
+    \frac{tf(t,d)(k_1+1)}{tf(t,d)+k_1(1-b+b|d|/avgdl)}.
+\end{equation}
+
+The default parameters are $k_1=1.5$ and $b=0.75$. BM25 is suitable for Reddit retrieval because Reddit documents vary significantly in length; some posts have only a short title, while others include long self-text and comments.
+
+\subsection{Field-Aware BM25}
+The project also supports field-aware BM25. Instead of treating title, body, and comments as a single flat text field, the system computes BM25 separately for each field and combines the scores:
+
+\begin{equation}
+    \text{score}(q,d) = w_t S_t(q,d) + w_b S_b(q,d) + w_c S_c(q,d).
+\end{equation}
+
+The default field weights are $w_t=2.0$, $w_b=1.0$, and $w_c=1.2$. This design gives extra importance to title matches while still using information from the body and comments.
+
+\section{Web Interface}
+The Flask application uses an app factory, configuration object, ranker pool, route handlers, templates, and static CSS. The application loads the index at startup and keeps rankers available through a shared pool so that repeated queries do not reload the index.
+
+The implemented routes are:
+
+\begin{itemize}
+    \item \texttt{/}: home page with the search form;
+    \item \texttt{/search?q=...}: single-ranker result page, with configurable ranker and top-$k$;
+    \item \texttt{/compare?q=...}: side-by-side comparison across available rankers.
+\end{itemize}
+
+The UI renders result cards using document metadata from the index store. It also generates snippets from the original self-text excerpt or title and highlights query matches.
+
+\screenshotbox{screenshots/home.png}{Search interface home page.}
+\screenshotbox{screenshots/result.png}{Ranked Reddit search results for a sample query.}
+\screenshotbox{screenshots/compare.png}{Side-by-side comparison of TF-IDF, BM25, and field-aware BM25.}
+
+\section{Empirical Evaluation}
+The project includes an evaluation harness for comparing rankers. The evaluation follows a pooled-labeling workflow similar to standard IR evaluation.
+
+\subsection{Evaluation Procedure}
+The evaluation process is:
+
+\begin{enumerate}[label=(\arabic*)]
+    \item Prepare 18 representative test queries in \texttt{qrel/queries.json}.
+    \item Use the system to generate a pooled result file from multiple rankers.
+    \item Manually label each pooled result in the \texttt{label} column, where 1 means relevant and 0 or blank means not relevant.
+    \item Save the labeled file as \texttt{qrel/qrels.csv}.
+    \item Run the evaluation script to compute per-query and aggregate metrics.
+\end{enumerate}
+
+The command is:
+
+\begin{lstlisting}[language=bash]
+python -m src.evaluate.cli run --qrels qrel/qrels.csv --index-dir data/index --output-dir qrel
+
+\end{lstlisting}
+
+The evaluation output includes per-query results and a summary table for ranker comparison.
+
+\subsection{Metrics}
+The evaluation module implements standard IR metrics in pure Python:
+
+\begin{itemize}
+    \item \textbf{Precision@k}: the fraction of the top $k$ retrieved documents that are relevant;
+    \item \textbf{MAP}: precision averaged over relevant ranks and then averaged across queries;
+    \item \textbf{NDCG@k}: metrics that reward relevant documents appearing higher in the ranking.
+\end{itemize}
+
+\noindent Unjudged documents are treated as non-relevant, following a common pooled-evaluation convention.
+
+\subsection{Evaluation Table}
+The table below should be filled with the final numbers generated from \texttt{data/qrels/summary.csv}.
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lccccc}
+\toprule
+\textbf{Ranker} & \textbf{Precision@5} & \textbf{NDCG@5} & \textbf{Precision@10} & \textbf{NDCG@10} & \textbf{MAP} \\
+\midrule
+TF-IDF cosine & 0.833 & 0.8548 & 0.7889 & 0.8182 & 0.306 \\
+BM25 & 0.8333 & 0.8642 & 0.7944 & 0.8296 & 0.3082 \\
+Field-aware BM25 & 0.6778 & 0.7145 & 0.5778 & 0.635 & 0.2087 \\
+\bottomrule
+\end{tabular}
+\caption{Empirical comparison of Reddit retrieval models. Replace TODO values with final scores from the evaluation script.}
+\label{tab:evaluation}
+\end{table}
+
+\subsection{Evaluation Discussion}
+The evaluation is intended to compare a vector-space baseline against BM25 and field-aware BM25. TF-IDF cosine similarity is expected to perform well when the query has clear lexical overlap with relevant posts. BM25 should handle long Reddit documents better because it uses term-frequency saturation and document-length normalization. Field-aware BM25 may further improve results when important query terms appear in titles or top comments, because title and comment fields can be weighted separately.
+
+\section{Project Achievements and Strengths}
+The main achievements of Reddit\_IR are:
+
+\begin{enumerate}[label=(\arabic*)]
+    \item \textbf{Complete end-to-end IR system}: The project covers data collection, preprocessing, indexing, retrieval, evaluation, and interface design.
+    \item \textbf{Persistent inverted index}: The system stores reusable index artifacts and manifest statistics, so search does not require rebuilding the corpus each time.
+    \item \textbf{Multiple rankers}: The project implements TF-IDF cosine similarity, BM25, and field-aware BM25 in a shared ranking framework.
+    \item \textbf{Reddit-specific preprocessing}: The preprocessing handles Reddit-specific noise such as markdown, removed comments, TLDR/edit markers, and informal stopwords.
+    \item \textbf{Field-aware retrieval}: The system preserves title, body, and comment fields separately, allowing more expressive ranking than a flat bag-of-words model.
+    \item \textbf{Evaluation support}: The evaluation package can generate pooled results, read qrels, compute metrics, and output summary files.
+    \item \textbf{Demo-ready web UI}: The Flask interface makes the system easy to demonstrate and compare interactively.
+\end{enumerate}
+
+\section{Limitations and Future Work}
+The current system has several limitations:
+
+\begin{enumerate}[label=(\arabic*)]
+    \item \textbf{Limited dataset}: Current data is not collected by crawler due to lack of Reddit Client ID. The dataset mixes the main text and comments, which makes some models' performance not ideal. Also, the dataset is not up-to-date, so the search result is often not linked to an existing page. 
+    \item \textbf{Lexical mismatch}: TF-IDF and BM25 still rely heavily on term overlap and may miss relevant results that use different wording.
+    \item \textbf{Subjective relevance labels}: Relevance judgments for Reddit posts can vary by user and query intent.
+    \item \textbf{No neural semantic matching}: The system does not yet use embeddings or neural reranking, so it has limited ability to handle paraphrases or implicit answers.
+\end{enumerate}
+
+Useful future extensions include:
+
+\begin{itemize}
+    \item adding sentence-transformer embeddings for semantic retrieval;
+    \item combining BM25 first-stage retrieval with neural reranking;
+    \item supporting filters by subreddit, date, score, or NSFW status;
+    \item adding query expansion or synonym expansion;
+    \item expanding the manually labeled evaluation set;
+    \item deploying the Flask interface online for easier grading and demonstration.
+\end{itemize}
+
+\section{Use of External Code and Data}
+The project uses standard external Python libraries, including PRAW, python-dotenv, NLTK, Flask, and pytest. These libraries provide Reddit API access, environment-variable loading, tokenization and stemming support, web serving, and testing. The project-specific crawler structure, preprocessing pipeline, inverted index, TF-IDF ranker, BM25 ranker, field-aware ranking logic, evaluation workflow, and Flask integration were developed for this course project.
+
+The project also reuses course concepts from previous assignments, including tokenization, stopword removal, stemming, vector-space retrieval, term weighting, BM25-style ranking, field weighting, and IR metric evaluation. These ideas were adapted to a new Reddit search-engine application.
+
+\section{Conclusion}
+Reddit\_IR demonstrates how information retrieval techniques can be applied to noisy real-world discussion data. The project collects Reddit posts and comments, preprocesses them into searchable token streams, builds persistent inverted indexes, ranks results using TF-IDF and BM25, supports field-aware ranking, provides a Flask search interface, and includes an empirical evaluation workflow. Overall, the project satisfies the final-project goal of applying course IR techniques to an original and practical application.
+
+
+
+\end{document}

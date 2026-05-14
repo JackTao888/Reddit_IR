@@ -85,8 +85,8 @@ def test_pool_generation_is_deterministic_and_complete(tmp_path: Path):
     artifacts = _build_artifacts(tmp_path)
     queries = [Query(qid="q1", text="python"), Query(qid="q2", text="climate")]
     rankers = [
-        ("tfidf", TfidfRanker(artifacts)),
-        ("bm25", Bm25Ranker(artifacts)),
+        ("tfidf_cosine", TfidfRanker(artifacts)),
+        ("bm25_plain", Bm25Ranker(artifacts)),
     ]
 
     rows1 = generate_pool(artifacts, rankers, queries, pool_depth=10, shuffle_seed=7)
@@ -126,10 +126,10 @@ def test_run_evaluation_end_to_end(tmp_path: Path):
     # Hand-built qrels: d1 and d2 relevant for "python", d4 relevant for "climate".
     qrels = {"q1": {"d1": 1, "d2": 1}, "q2": {"d4": 1}}
 
-    rankers = [("bm25", Bm25Ranker(artifacts))]
+    rankers = [("bm25_plain", Bm25Ranker(artifacts))]
     results = run_evaluation(rankers, queries, qrels, top_k=5)
 
-    bm25 = results["per_ranker"]["bm25"]
+    bm25 = results["per_ranker"]["bm25_plain"]
     assert bm25["aggregate"]["n_queries"] == 2
     # BM25 should retrieve the relevant docs in top-5 → P@5 should be > 0.
     assert bm25["aggregate"]["P@5"] > 0
@@ -142,3 +142,11 @@ def test_run_evaluation_end_to_end(tmp_path: Path):
     assert summary.exists()
     summary_text = summary.read_text(encoding="utf-8")
     assert "ranker" in summary_text and "MAP" in summary_text
+
+
+def test_evaluate_build_rankers_dedupes_legacy_aliases(tmp_path: Path):
+    from src.evaluate.cli import _build_rankers_from_names
+
+    artifacts = _build_artifacts(tmp_path)
+    rankers = _build_rankers_from_names(artifacts, ["tfidf", "tfidf_cosine", "bm25", "bm25_plain"])
+    assert [n for n, _ in rankers] == ["tfidf_cosine", "bm25_plain"]

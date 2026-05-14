@@ -42,7 +42,7 @@ class Bm25Ranker(BaseRanker):
         self.name = (
             f"bm25_field(k1={self.k1},b={self.b})"
             if self.field_weights is not None
-            else f"bm25(k1={self.k1},b={self.b})"
+            else f"bm25_plain(k1={self.k1},b={self.b})"
         )
 
     @staticmethod

@@ -3,7 +3,7 @@
 Public API:
 - AppConfig: typed startup configuration
 - create_app: Flask app factory (loads index + ranker pool once)
-- RankerPool: lazy-init container of TfidfRanker / Bm25Ranker / Bm25 field-aware
+- RankerPool: lazy-init container (default matrix: TF–IDF variants, BM25, two-stage, **LSI**, **PRF**)
 - main: CLI entry point (``python -m src.app.cli``)
 """
 

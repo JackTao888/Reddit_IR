@@ -148,3 +148,48 @@ def test_bm25_field_aware_zero_weight_disables_field(synthetic_artifacts):
 def test_empty_query_returns_empty(synthetic_artifacts):
     assert TfidfRanker(synthetic_artifacts).search("", top_k=5) == []
     assert Bm25Ranker(synthetic_artifacts).search("the and", top_k=5) == []
+
+
+def test_tfidf_rerank_candidates_respects_order_and_top_k(synthetic_artifacts):
+    tf = TfidfRanker(synthetic_artifacts)
+    # Deliberately worse order: d2 listed first; d1 should still win TF-IDF on "python".
+    out = tf.rerank_candidates("python", ["d2", "d1", "d4"], top_k=2)
+    assert len(out) == 2
+    assert out[0].doc_id == "d1"
+    assert {out[1].doc_id} <= {"d2", "d4"}
+
+
+def test_twostage_bm25_tfidf_non_empty(synthetic_artifacts):
+    from src.rankers.two_stage_ranker import TwoStageBm25TfidfRanker
+
+    r = TwoStageBm25TfidfRanker(synthetic_artifacts, stage1_k=50)
+    results = r.search("python", top_k=3)
+    assert results
+    assert {x.doc_id for x in results} <= {"d1", "d2", "d4"}
+
+
+def test_tfidf_overlap_still_supported_for_ablations(synthetic_artifacts):
+    from src.rankers.registry import build_ranker
+
+    r = build_ranker("tfidf_overlap", synthetic_artifacts)
+    assert r.name == "tfidf_overlap"
+    assert r.search("python", top_k=3)
+
+
+def test_tfidf_dice_returns_ranked_results(synthetic_artifacts):
+    ranker = TfidfRanker(synthetic_artifacts, similarity="dice")
+    assert ranker.name == "tfidf_dice"
+    results = ranker.search("python", top_k=5)
+    assert results
+    assert {r.doc_id for r in results} <= {"d1", "d2", "d4"}
+
+
+def test_registry_legacy_aliases_roundtrip(synthetic_artifacts):
+    from src.rankers.registry import build_ranker, canonical_ranker_name
+
+    assert canonical_ranker_name("tfidf") == "tfidf_cosine"
+    assert canonical_ranker_name("bm25") == "bm25_plain"
+    a = build_ranker("tfidf", synthetic_artifacts)
+    b = build_ranker("tfidf_cosine", synthetic_artifacts)
+    assert type(a) is type(b)
+    assert a.search("python", top_k=3) == b.search("python", top_k=3)
