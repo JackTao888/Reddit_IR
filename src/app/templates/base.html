@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Reddit IR{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <header class="site-header">
+    <a href="{{ url_for('main.index') }}" class="logo">Reddit IR</a>
+    <span class="subtitle">JHU 601.466/666 Information Retrieval &mdash; Final Project</span>
+  </header>
+
+  <section class="search-section">
+    <form action="{{ url_for('main.search') }}" method="get" class="search-form" autocomplete="off">
+      <input
+        type="text"
+        name="q"
+        value="{{ query|default('') }}"
+        placeholder="Search the Reddit corpus..."
+        aria-label="Query"
+        autofocus
+      >
+      <select name="ranker" aria-label="Ranker">
+        {% for r in available_rankers %}
+          <option value="{{ r }}" {% if r == current_ranker %}selected{% endif %}>{{ r }}</option>
+        {% endfor %}
+      </select>
+      <select name="k" aria-label="Number of results (top K)" title="Top K">
+        {% for kk in (10, 20, 30) %}
+          <option value="{{ kk }}" {% if kk == (current_top_k|default(10)) %}selected{% endif %}>Top {{ kk }}</option>
+        {% endfor %}
+      </select>
+      <button type="submit">Search</button>
+      {% if query %}
+        <a class="compare-link" href="{{ url_for('main.compare', q=query, k=current_top_k|default(10)) }}">Compare all rankers &rarr;</a>
+      {% endif %}
+    </form>
+  </section>
+
+  <main class="content">
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="site-footer">
+    Indexed <strong>{{ n_docs }}</strong> documents &middot; rankers:
+    {% for r in available_rankers %}<code>{{ r }}</code>{% if not loop.last %}, {% endif %}{% endfor %}
+  </footer>
+</body>
+</html>

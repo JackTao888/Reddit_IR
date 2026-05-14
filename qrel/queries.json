@@ -1,0 +1,22 @@
+{
+  "queries": [
+    {"qid": "q1", "text": "minecraft shader first person hand invisible glitch", "category": "gaming"},
+    {"qid": "q2", "text": "league of legends champion pick ranked advice", "category": "gaming"},
+    {"qid": "q3", "text": "skyrim mod load order crash fix", "category": "gaming"},
+    {"qid": "q4", "text": "dota 2 last hitting lane creep timing", "category": "gaming"},
+    {"qid": "q5", "text": "climate change evidence peer reviewed study", "category": "learning"},
+    {"qid": "q6", "text": "explain like im five how vaccines work", "category": "learning"},
+    {"qid": "q7", "text": "black hole event horizon telescope image", "category": "learning"},
+    {"qid": "q8", "text": "world news election congress foreign policy", "category": "news"},
+    {"qid": "q9", "text": "breaking bad walter white ending theory", "category": "television"},
+    {"qid": "q10", "text": "game of thrones iron throne season finale", "category": "television"},
+    {"qid": "q11", "text": "doctor who tardis regeneration episode", "category": "television"},
+    {"qid": "q12", "text": "star wars sequel trilogy lightsaber fight", "category": "entertainment"},
+    {"qid": "q13", "text": "anime season recommendation slice of life", "category": "entertainment"},
+    {"qid": "q14", "text": "meal prep budget cheap healthy recipes", "category": "lifestyle"},
+    {"qid": "q15", "text": "life hack organize small apartment storage", "category": "lifestyle"},
+    {"qid": "q16", "text": "dad joke pun one liner funny", "category": "humor"},
+    {"qid": "q17", "text": "today i learned historical fact surprising", "category": "learning"},
+    {"qid": "q18", "text": "harry potter house sorting quiz discussion", "category": "entertainment"}
+  ]
+}

@@ -1,0 +1,15 @@
+# Crawler
+praw>=7.7,<8
+python-dotenv>=1.0
+
+# Preprocessing (NLTK is a soft dep; package degrades to regex/identity if missing)
+nltk>=3.8
+
+# Web UI
+flask>=3.0
+
+# Test runner
+pytest>=7.0
+
+# Other modules may add their deps later:
+# scikit-learn, numpy, ir-measures

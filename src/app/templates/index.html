@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Reddit IR &mdash; Search{% endblock %}
+{% block content %}
+  <div class="welcome">
+    <h1>Search a Reddit corpus</h1>
+    <p>
+      Multi-subreddit retrieval engine implementing TF-IDF cosine similarity and
+      BM25 (plain &amp; field-aware) over a local index of <strong>{{ n_docs }}</strong> documents.
+    </p>
+    <p class="muted">
+      Try a query above, then click <em>Compare all rankers</em> to see results
+      from <code>tfidf</code>, <code>bm25</code> and <code>bm25_field</code> side-by-side.
+    </p>
+  </div>
+{% endblock %}

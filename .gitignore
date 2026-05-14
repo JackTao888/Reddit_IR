@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Secrets
+.env
+
+# Large / generated IR artifacts (rebuild locally)
+data/
+
+# Pandas CSV dumps (regenerate with project scripts)
+dataset/*
+!dataset/README.md
+
+# Eval outputs (keep queries.json etc. if present; ignore generated CSVs)
+qrel/*.csv
+
+# Stray CSV at repo root
+/*.csv
+
+# OS
+.DS_Store
+Thumbs.db
